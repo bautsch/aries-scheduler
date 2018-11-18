@@ -1,7 +1,3 @@
-# Version 1.5
-# line 397/425 subtracted drill_time and compl_time from drill finish and compl finish
-
-
 from datetime import date
 from datetime import timedelta
 from datetime import datetime
