@@ -318,18 +318,20 @@ class Schedule(object):
         else:
             file_name = self.schedule_path+self.schedule_name+' Exact Dates.csv' 
         with open(file_name, 'w') as f:
-            line = ','.join(['PROPNUM', 'DRILL', 'COMPL', 'START'])
+            line = ','.join(['PROPNUM', 'PAD', 'DRILL', 'COMPL', 'START'])
             f.write(line+'\n')
             for rig in self.rig_dict.values():
                 for _, pad in enumerate(rig.pad_list):
                     for _, well in enumerate(pad.well_list):
                         if rig.rig_name != 'DUC':
                             line = ','.join([well.propnum,
+                                             well.pad_name,
                                              well.drill_date.strftime('%m/%d/%Y'),
                                              well.compl_date.strftime('%m/%d/%Y'),
                                              well.start_date.strftime('%m/%d/%Y')])
                         else:
                             line = ','.join([well.propnum,
+                                             well.pad_name,
                                              str(np.nan),
                                              well.compl_date.strftime('%m/%d/%Y'),
                                              well.start_date.strftime('%m/%d/%Y')])
