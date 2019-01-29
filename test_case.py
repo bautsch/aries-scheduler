@@ -1,13 +1,13 @@
+'''
+Test scheduleer
+'''
+
 import aries_scheduler
-from datetime import datetime
+# import pandas as pd
 
-rigs = rig_starts = {'DUC':     None,
-                     'RIG 01':  datetime(2019, 1, 1, 7, 0, 0), 
-                     'RIG 02':  datetime(2019, 4, 1, 7, 0, 0),
-                    }
+SCHEDULE_NAME = 'Test Schedule'
+SCHEDULE_FILE_PATH = 'test_case.xlsx'
 
-name = 'Test Schedule'
-path = 'test_case.xlsx'
+TEST_SCHEDULE = aries_scheduler.Schedule(SCHEDULE_NAME, SCHEDULE_FILE_PATH)
 
-test_schedule = aries_scheduler.Schedule(name, path, rigs)
-
+# schedule = pd.read_excel(SCHEDULE_FILE_PATH, sheet_name='SCHEDULE')
