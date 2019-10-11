@@ -17,10 +17,13 @@ from bokeh.layouts import column
 
 class Schedule():
     def __init__(self, schedule_name, schedule_file_path,
-                 output_file_path=None, verbose=False):
+                 output_file_path=None, gantt_start_date=date(2019, 1, 1),
+                 verbose=False):
         self.schedule_name = schedule_name
         self.schedule_path = schedule_file_path
         self.output_path = output_file_path
+        self.gantt_start_date = gantt_start_date
+        self.gantt_end_date = gantt_start_date + relativedelta(years=+3)
         self.input_df = pd.read_excel(self.schedule_path,
                                       sheet_name='INPUTS')
         self.schedule_df = pd.read_excel(self.schedule_path,
@@ -239,6 +242,7 @@ class Schedule():
                 if not pd.isnull(row['FLOWBACK']):
                     self.pad_dict[row[
                         'PAD']].set_flowback_time(row['FLOWBACK'])
+                self.pad_dict[row['PAD']].set_pod_size(row['POD_SIZE'])
                 if not pd.isnull(row['COMPL_START']):
                     self.pad_dict[row['PAD']].compl_start = row['COMPL_START']
                 if not pd.isnull(row['COMPL_END']):
@@ -383,25 +387,68 @@ class Schedule():
 
     def calc_start_dates(self, rig):
         for pad in rig.pad_list:
+            well_ids = np.arange(1, len(pad.well_list)+1)
+            if pad.pod_size > 0:
+                pods = [w for w in well_ids
+                        if (w % pad.pod_size == 0) and (w > 0)]
+                if max(well_ids) > max(pods):
+                    pods.append(max(well_ids))
             for idw, well in enumerate(pad.well_list):
                 if pad.prod_finish is None:
                     if idw == 0:
                         if pad.prod_start is None:
-                            well.start_date = (well.compl_date
-                                               + timedelta(well.compl_time)
-                                               + timedelta(well.flowback_time))
-                            pad.prod_start = well.start_date
+                            if pad.pod_size == 0:
+                                start = (well.compl_date
+                                         + timedelta(well.compl_time)
+                                         + timedelta(well.flowback_time))
+                                well.start_date = start
+                                pad.prod_start = well.start_date
+                            else:
+                                tmp_pods = [p - idw for p in pods]
+                                idx_tmp = min(t for t in tmp_pods if t > 0)
+                                idx_tmp = tmp_pods.index(idx_tmp)
+                                idx_tmp = pods[idx_tmp] - 1
+                                idx_tmp = pad.pod_size - 1
+                                pod_compl = pad.well_list[idx_tmp].compl_date
+                                pod_prod = (pod_compl
+                                            + timedelta(well.compl_time)
+                                            + timedelta(well.flowback_time))
+                                well.start_date = pod_prod
+                                pad.prod_start = well.start_date
                         else:
                             well.start_date = pad.prod_start
                     elif idw == len(pad.well_list)-1:
-                        well.start_date = (well.compl_date
-                                           + timedelta(well.compl_time)
-                                           + timedelta(well.flowback_time))
-                        pad.prod_finish = well.start_date
+                        if pad.pod_size == 0:
+                            well.start_date = (well.compl_date
+                                               + timedelta(well.compl_time)
+                                               + timedelta(well.flowback_time))
+                            pad.prod_finish = well.start_date
+                        else:
+                            tmp_pods = [p - idw for p in pods]
+                            idx_tmp = min(t for t in tmp_pods if t > 0)
+                            idx_tmp = tmp_pods.index(idx_tmp)
+                            idx_tmp = pods[idx_tmp] - 1
+                            pod_compl = pad.well_list[idx_tmp].compl_date
+                            pod_prod = (pod_compl
+                                        + timedelta(well.compl_time)
+                                        + timedelta(well.flowback_time))
+                            well.start_date = pod_prod
+                            pad.prod_finish = well.start_date
                     else:
-                        well.start_date = (well.compl_date
-                                           + timedelta(well.compl_time)
-                                           + timedelta(well.flowback_time))
+                        if pad.pod_size == 0:
+                            well.start_date = (well.compl_date
+                                               + timedelta(well.compl_time)
+                                               + timedelta(well.flowback_time))
+                        else:
+                            tmp_pods = [p - idw for p in pods]
+                            idx_tmp = min(t for t in tmp_pods if t > 0)
+                            idx_tmp = tmp_pods.index(idx_tmp)
+                            idx_tmp = pods[idx_tmp] - 1
+                            pod_compl = pad.well_list[idx_tmp].compl_date
+                            pod_prod = (pod_compl
+                                        + timedelta(well.compl_time)
+                                        + timedelta(well.flowback_time))
+                            well.start_date = pod_prod
                 elif (pad.prod_start is not None and
                       pad.prod_finish is not None):
                     prod_time = ((pad.prod_finish - pad.prod_start).days
@@ -684,8 +731,8 @@ class Schedule():
             rigs = list(dfr.rig.unique())
             rigs.reverse()
             p_dict[r] = figure(y_range=rigs, x_axis_type='datetime',
-                               x_range=Range1d(date(2018, 1, 1),
-                                               date(2022, 12, 31)),
+                               x_range=Range1d(self.gantt_start_date,
+                                               self.gantt_end_date),
                                plot_width=1500, plot_height=plot_height,
                                toolbar_location='above', active_drag='pan',
                                title=r+' Schedule')
@@ -852,6 +899,7 @@ class Pad(object):
         self.num_wells = 0
         self.well_list = []
         self.build_pad = 30
+        self.pod_size = 4
         self.conductors = self.rig.conductors
         self.mob_in = self.rig.mob_in
         self.mob_out = self.rig.mob_out
@@ -987,6 +1035,12 @@ class Pad(object):
 
         for well in self.well_list:
             well.set_flowback_time(flowback_days)
+
+    def set_pod_size(self, pod_size):
+        """Set number of wells in each completion pod. Wells turn on in
+           pod-sized batches at the same date post flowback."""
+
+        self.pod_size = pod_size
 
 
 class Well(object):
