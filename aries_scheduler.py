@@ -35,6 +35,8 @@ class Schedule():
         self.rig_dict = {}
         self.pad_dict = {}
         self.well_dict = {}
+        self.exact_dates = pd.DataFrame(columns=['WELL_ID', 'DRILL',
+                                                 'COMPLETE', 'START'])
         self.gantt_df = None
         self.build_dictionaries()
         self.parse_inputs()
@@ -84,6 +86,8 @@ class Schedule():
                                                   row['DEPTH'], self.verbosity)
             self.well_dict[row['PROPNUM']].drill_cost = row['DRILL_COST']
             self.well_dict[row['PROPNUM']].compl_cost = row['COMPL_COST']
+        well_id = pd.Series([well.propnum for well in self.well_dict.values()])
+        self.exact_dates['WELL_ID'] = well_id
 
     def parse_inputs(self):
         for rigname in self.schedule_df['RIG'].unique():
@@ -269,8 +273,12 @@ class Schedule():
                                                    + timedelta(pad.conductors)
                                                    + timedelta(pad.mob_in))
                                 pad.drill_start = well.drill_date
+                                self.exact_dates.loc[self.exact_dates['WELL_ID'] == well.propnum,
+                                                     'DRILL'] = well.drill_date
                             else:
                                 well.drill_date = pad.drill_start
+                                self.exact_dates.loc[self.exact_dates['WELL_ID'] == well.propnum,
+                                                     'DRILL'] = well.drill_date
                         elif idw == len(pad.well_list)-1:
                             prior_well = pad.well_list[idw-1]
                             well.drill_date = (prior_well.drill_date
@@ -279,11 +287,15 @@ class Schedule():
                             pad.drill_finish = (well.drill_date
                                                 + timedelta(well.drill_time)
                                                 + timedelta(pad.mob_out))
+                            self.exact_dates.loc[self.exact_dates['WELL_ID'] == well.propnum,
+                                                 'DRILL'] = well.drill_date
                         else:
                             prior_well = pad.well_list[idw-1]
                             well.drill_date = (prior_well.drill_date
                                                + timedelta(
                                                    prior_well.drill_time))
+                            self.exact_dates.loc[self.exact_dates['WELL_ID'] == well.propnum,
+                                                 'DRILL'] = well.drill_date
                     else:
                         if idw == 0:
                             if pad.drill_start is None:
@@ -292,8 +304,12 @@ class Schedule():
                                 well.drill_date = (prior_pad_finish
                                                    + timedelta(pad.mob_in))
                                 pad.drill_start = well.drill_date
+                                self.exact_dates.loc[self.exact_dates['WELL_ID'] == well.propnum,
+                                                     'DRILL'] = well.drill_date
                             else:
                                 well.drill_date = pad.drill_start
+                                self.exact_dates.loc[self.exact_dates['WELL_ID'] == well.propnum,
+                                                     'DRILL'] = well.drill_date
                         elif idw == len(pad.well_list)-1:
                             prior_well = pad.well_list[idw-1]
                             well.drill_date = (prior_well.drill_date
@@ -302,23 +318,33 @@ class Schedule():
                             pad.drill_finish = (well.drill_date
                                                 + timedelta(well.drill_time)
                                                 + timedelta(pad.mob_out))
+                            self.exact_dates.loc[self.exact_dates['WELL_ID'] == well.propnum,
+                                                 'DRILL'] = well.drill_date
                         else:
                             prior_well = pad.well_list[idw-1]
                             well.drill_date = (prior_well.drill_date
                                                + timedelta(
                                                    prior_well.drill_time))
+                            self.exact_dates.loc[self.exact_dates['WELL_ID'] == well.propnum,
+                                                 'DRILL'] = well.drill_date
             elif pad.drill_start is not None and pad.drill_finish is not None:
                 drill_time = ((pad.drill_finish - pad.drill_start).days
                               / pad.num_wells)
                 for idw, well in enumerate(pad.well_list):
                     if idw == 0:
                         well.drill_date = pad.drill_start
+                        self.exact_dates.loc[self.exact_dates['WELL_ID'] == well.propnum,
+                                             'DRILL'] = well.drill_date
                     elif idw == len(pad.well_list) - 1:
                         well.drill_date = (pad.drill_finish
                                            - timedelta(drill_time))
+                        self.exact_dates.loc[self.exact_dates['WELL_ID'] == well.propnum,
+                                             'DRILL'] = well.drill_date
                     else:
                         well.drill_date = (pad.well_list[idw-1].drill_date
                                            + timedelta(drill_time))
+                        self.exact_dates.loc[self.exact_dates['WELL_ID'] == well.propnum,
+                                             'DRILL'] = well.drill_date
 
     def calc_compl_dates(self, rig):
         for pad in rig.pad_list:
@@ -327,30 +353,47 @@ class Schedule():
                     if pad.compl_finish is None:
                         if idw == 0:
                             well.compl_date = pad.compl_start
+                            self.exact_dates.loc[self.exact_dates['WELL_ID'] == well.propnum,
+                                                 'COMPLETE'] = well.compl_date
+
                         elif idw == len(pad.well_list)-1:
                             prior_well = pad.well_list[idw-1]
                             well.compl_date = (prior_well.compl_date
                                                + timedelta(
                                                    prior_well.compl_time))
                             pad.compl_finish = well.compl_date
+                            self.exact_dates.loc[self.exact_dates['WELL_ID'] == well.propnum,
+                                                 'COMPLETE'] = well.compl_date
                         else:
                             prior_well = pad.well_list[idw-1]
                             well.compl_date = (prior_well.compl_date
                                                + timedelta(
                                                    prior_well.compl_time))
+                            self.exact_dates.loc[self.exact_dates['WELL_ID'] == well.propnum,
+                                                 'COMPLETE'] = well.compl_date
                     else:
                         compl_time = ((pad.compl_finish - pad.compl_start).days
                                       / pad.num_wells)
                         for idw2, well2 in enumerate(pad.well_list):
                             if idw2 == 0:
                                 well2.compl_date = pad.compl_start
+                                self.exact_dates.loc[self.exact_dates['WELL_ID'] ==
+                                                     well2.propnum,
+                                                     'COMPLETE'] = well2.compl_date
                             elif idw2 == len(pad.well_list) - 1:
                                 well2.compl_date = (pad.compl_finish
                                                     - timedelta(compl_time))
+                                self.exact_dates.loc[self.exact_dates['WELL_ID'] ==
+                                                     well2.propnum,
+                                                     'COMPLETE'] = well2.compl_date
                             else:
                                 well2.compl_date = (pad.well_list[
                                     idw2-1].compl_date +
                                                     timedelta(compl_time))
+                                self.exact_dates.loc[self.exact_dates['WELL_ID'] ==
+                                                     well2.propnum,
+                                                 'COMPLETE'] = well2.compl_date
+
                 elif pad.compl_finish is None:
                     if idw == 0:
                         if pad.compl_start is None:
@@ -359,17 +402,25 @@ class Schedule():
                                                + timedelta(
                                                    pad.build_facilities))
                             pad.compl_start = well.compl_date
+                            self.exact_dates.loc[self.exact_dates['WELL_ID'] == well.propnum,
+                                                 'COMPLETE'] = well.compl_date
                         else:
                             well.compl_date = pad.compl_start
+                            self.exact_dates.loc[self.exact_dates['WELL_ID'] == well.propnum,
+                                                 'COMPLETE'] = well.compl_date
                     elif idw == len(pad.well_list)-1:
                         prior_well = pad.well_list[idw-1]
                         well.compl_date = (prior_well.compl_date
                                            + timedelta(prior_well.compl_time))
                         pad.compl_finish = well.compl_date
+                        self.exact_dates.loc[self.exact_dates['WELL_ID'] == well.propnum,
+                                                 'COMPLETE'] = well.compl_date
                     else:
                         prior_well = pad.well_list[idw-1]
                         well.compl_date = (prior_well.compl_date
                                            + timedelta(prior_well.compl_time))
+                        self.exact_dates.loc[self.exact_dates['WELL_ID'] == well.propnum,
+                                             'COMPLETE'] = well.compl_date
                 elif (pad.compl_start is not None and
                       pad.compl_finish is not None):
                     compl_time = ((pad.compl_finish - pad.compl_start).days
@@ -377,13 +428,22 @@ class Schedule():
                     for idw2, well2 in enumerate(pad.well_list):
                         if idw2 == 0:
                             well2.compl_date = pad.compl_start
+                            self.exact_dates.loc[self.exact_dates['WELL_ID'] ==
+                                                 well2.propnum,
+                                                 'COMPLETE'] == well2.compl_date 
                         elif idw2 == len(pad.well_list) - 1:
                             well2.compl_date = (pad.compl_finish
                                                 - timedelta(compl_time))
+                            self.exact_dates.loc[self.exact_dates['WELL_ID'] ==
+                                                 well2.propnum,
+                                                 'COMPLETE'] == well2.compl_date
                         else:
                             well2.compl_date = (pad.well_list[
                                 idw2-1].compl_date +
                                                 timedelta(compl_time))
+                            self.exact_dates.loc[self.exact_dates['WELL_ID'] ==
+                                                 well2.propnum,
+                                                 'COMPLETE'] == well2.compl_date
 
     def calc_start_dates(self, rig):
         for pad in rig.pad_list:
@@ -403,6 +463,9 @@ class Schedule():
                                          + timedelta(well.flowback_time))
                                 well.start_date = start
                                 pad.prod_start = well.start_date
+                                self.exact_dates.loc[self.exact_dates['WELL_ID'] ==
+                                                                      well.propnum,
+                                                                      'START'] = well.start_date
                             else:
                                 tmp_pods = [p - idw for p in pods]
                                 idx_tmp = min(t for t in tmp_pods if t > 0)
@@ -415,14 +478,23 @@ class Schedule():
                                             + timedelta(well.flowback_time))
                                 well.start_date = pod_prod
                                 pad.prod_start = well.start_date
+                                self.exact_dates.loc[self.exact_dates['WELL_ID'] ==
+                                                                      well.propnum,
+                                                                      'START'] = well.start_date
                         else:
                             well.start_date = pad.prod_start
+                            self.exact_dates.loc[self.exact_dates['WELL_ID'] ==
+                                                                  well.propnum,
+                                                                  'START'] = well.start_date
                     elif idw == len(pad.well_list)-1:
                         if pad.pod_size == 0:
                             well.start_date = (well.compl_date
                                                + timedelta(well.compl_time)
                                                + timedelta(well.flowback_time))
                             pad.prod_finish = well.start_date
+                            self.exact_dates.loc[self.exact_dates['WELL_ID'] ==
+                                                                  well.propnum,
+                                                                  'START'] = well.start_date
                         else:
                             tmp_pods = [p - idw for p in pods]
                             idx_tmp = min(t for t in tmp_pods if t > 0)
@@ -434,11 +506,17 @@ class Schedule():
                                         + timedelta(well.flowback_time))
                             well.start_date = pod_prod
                             pad.prod_finish = well.start_date
+                            self.exact_dates.loc[self.exact_dates['WELL_ID'] ==
+                                                                  well.propnum,
+                                                                  'START'] = well.start_date
                     else:
                         if pad.pod_size == 0:
                             well.start_date = (well.compl_date
                                                + timedelta(well.compl_time)
                                                + timedelta(well.flowback_time))
+                            self.exact_dates.loc[self.exact_dates['WELL_ID'] ==
+                                                                  well.propnum,
+                                                                  'START'] = well.start_date
                         else:
                             tmp_pods = [p - idw for p in pods]
                             idx_tmp = min(t for t in tmp_pods if t > 0)
@@ -449,6 +527,9 @@ class Schedule():
                                         + timedelta(well.compl_time)
                                         + timedelta(well.flowback_time))
                             well.start_date = pod_prod
+                            self.exact_dates.loc[self.exact_dates['WELL_ID'] ==
+                                                                  well.propnum,
+                                                                  'START'] = well.start_date
                 elif (pad.prod_start is not None and
                       pad.prod_finish is not None):
                     prod_time = ((pad.prod_finish - pad.prod_start).days
@@ -456,12 +537,20 @@ class Schedule():
                     for idw2, well2 in enumerate(pad.well_list):
                         if idw2 == 0:
                             well2.start_date = pad.compl_start
+                            self.exact_dates.loc[self.exact_dates['WELL_ID'] ==
+                                                                  well2.propnum,
+                                                                  'START'] = well2.start_date
                         elif idw2 == len(pad.well_list) - 1:
                             well2.start_date = pad.start_finish
+                            self.exact_dates.loc[self.exact_dates['WELL_ID'] ==
+                                                                  well2.propnum,
+                                                                  'START'] = well2.start_date
                         else:
                             well2.start_date = (pad.well_list[idw-1].start_date
                                                 + timedelta(prod_time))
-
+                            self.exact_dates.loc[self.exact_dates['WELL_ID'] ==
+                                                                  well2.propnum,
+                                                                  'START'] = well2.start_date
     def calc_build_pad_dates(self, rig):
         for pad in rig.pad_list:
             if rig.rig_name != 'DUC':
@@ -782,7 +871,7 @@ class Schedule():
         show(p_columns)
 
 
-class Rig(object):
+class Rig():
     def __init__(self, rig_name, start, verbose=False):
         self.rig_name = rig_name
         self.start = start
@@ -890,7 +979,7 @@ class Rig(object):
         print('\n')
 
 
-class Pad(object):
+class Pad():
 
     def __init__(self, pad_name, rig, verbose=False):
         self.pad_name = pad_name
